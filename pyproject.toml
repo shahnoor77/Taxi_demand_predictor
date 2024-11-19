@@ -6,9 +6,29 @@ authors = ["Shahnoor07 <shahnoorkhan9955@gmail.com>"]
 readme = "README.md"
 
 [tool.poetry.dependencies]
-python = "^3.12"
+python = ">=3.11.0,<3.13"
+wget = "^3.2"
+pandas = "<2.2.0"
+jupyter = "^1.0.0"
+pyarrow = "^17.0.0"
+requests = "^2.32.3"
+path = "^17.0.0"
+pathlib = "^1.0.1"
+tqdm = "^4.66.5"
+plotly = "^5.24.1"
+scikit-learn = "^1.5.2"
+xgboost = "^2.1.1"
+lightgbm = "^4.5.0"
+optuna = "^4.0.0"
+twofish = "^0.3.0"
+hopsworks = "^3.7.0"
+python-dotenv = "0.21.0"
+sdl = "^0.0.0"
 
+
+[tool.poetry.group.dev.dependencies]
+ipykernel = "^6.29.5"
 
 [build-system]
-requires = ["poetry-core"]
+requires = ["poetry-core>=1.0.0"]
 build-backend = "poetry.core.masonry.api"
