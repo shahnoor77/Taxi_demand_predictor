@@ -7,7 +7,7 @@ on:
   workflow_dispatch:
 
 env:
-  PYTHON_VERSION: ">=3.11.0,<3.13"
+  PYTHON_VERSION: 3.9
   POETRY_VERSION: 1.8.2
   POETRY_URL: https://install.python-poetry.org
 
