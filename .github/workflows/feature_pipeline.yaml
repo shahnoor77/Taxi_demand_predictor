@@ -7,7 +7,7 @@ on:
   workflow_dispatch:
 
 env:
-  PYTHON_VERSION: 3.12
+  PYTHON_VERSION: 3.12.4
   POETRY_VERSION: 1.8.2
   POETRY_URL: https://install.python-poetry.org
 
@@ -27,7 +27,7 @@ jobs:
         path: ~/.cache/pypoetry
         key: poetry-cache-${{ runner.os }}-${{ env.PYTHON_VERSION }}-${{ env.POETRY_VERSION }}
     
-    # virtualenv cache should depends on OS, Python version and `poetry.lock` (and optionally workflow files).
+    # virtualenv cache should depends on OS, Python version and poetry.lock (and optionally workflow files).
     - name: Cache Packages
       uses: actions/cache@v3
       with:
@@ -51,4 +51,4 @@ jobs:
       env: 
         HOPSWORKS_PROJECT_NAME: ${{ secrets.HOPSWORKS_PROJECT_NAME }}
         HOPSWORKS_API_KEY: ${{ secrets.HOPSWORKS_API_KEY }}
-      run: make features
+      run: make features 
