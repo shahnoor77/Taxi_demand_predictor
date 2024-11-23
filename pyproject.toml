@@ -24,6 +24,7 @@ twofish = "^0.3.0"
 hopsworks = "^3.7.0"
 python-dotenv = "0.21.0"
 sdl = "^0.0.0"
+ipykernel = "^6.29.5"
 
 
 [tool.poetry.group.dev.dependencies]
