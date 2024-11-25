@@ -1,166 +1,73 @@
-from datetime import datetime, timedelta
-
-import hopsworks
-# from hsfs.feature_store import FeatureStore
+from argparse import ArgumentParser
+from datetime import datetime
+from typing import Optional
 import pandas as pd
-import numpy as np
+from hsfs.client.exceptions import RestAPIError
+from retry import retry
 
-import src.config as config
-from src.feature_store_api import get_feature_store, get_or_create_feature_view
-from src.config import FEATURE_VIEW_METADATA
+from src.config import FEATURE_GROUP_PREDICTIONS_METADATA, MODEL_NAME
+from src.feature_store_api import get_or_create_feature_group
+from src.inference import get_model_predictions, load_batch_of_features_from_store
+from src.logger import get_logger
+from src.model_registry_api import get_latest_model_from_registry
 
-
-def get_hopsworks_project() -> hopsworks.project.Project:
-
-    return hopsworks.login(
-        project=config.HOPSWORKS_PROJECT_NAME,
-        api_key_value=config.HOPSWORKS_API_KEY
-    )
+logger = get_logger()
 
 
-def get_model_predictions(model, features: pd.DataFrame) -> pd.DataFrame:
-    """"""
-    # past_rides_columns = [c for c in features.columns if c.startswith('rides_')]
-    predictions = model.predict(features)
-
-    results = pd.DataFrame()
-    results['pickup_location_id'] = features['pickup_location_id'].values
-    results['predicted_demand'] = predictions.round(0)
-
-    return results
-
-
-def load_batch_of_features_from_store(
-    current_date: pd.Timestamp,
-) -> pd.DataFrame:
-    """Fetches the batch of features used by the ML system at `current_date`
-
-    Args:
-        current_date (datetime): datetime of the prediction for which we want
-        to get the batch of features
-
-    Returns:
-        pd.DataFrame: 4 columns:
-            - `pickup_hour`
-            - `rides`
-            - `pickup_location_id`
-            - `pickpu_ts`
+@retry(RestAPIError, tries=3, delay=60)
+def save_predictions_to_feature_store(predictions: pd.DataFrame) -> None:
     """
-    n_features = config.N_FEATURES
+    Saves model predictions to the feature store.
 
-    feature_view = get_or_create_feature_view(FEATURE_VIEW_METADATA)
-
-    # fetch data from the feature store
-    fetch_data_from = current_date - timedelta(days=28)
-    fetch_data_to = current_date - timedelta(hours=1)
-
-    # add plus minus margin to make sure we do not drop any observation
-    ts_data = feature_view.get_batch_data(
-        start_time=fetch_data_from - timedelta(days=1),
-        end_time=fetch_data_to + timedelta(days=1)
-    )
-
-    # filter data to the time period we are interested in
-    pickup_ts_from = int(fetch_data_from.timestamp() * 1000)
-    pickup_ts_to = int(fetch_data_to.timestamp() * 1000)
-    ts_data = ts_data[ts_data.pickup_ts.between(pickup_ts_from, pickup_ts_to)]
-
-    # sort data by location and time
-    ts_data.sort_values(by=['pickup_location_id', 'pickup_hour'], inplace=True)
-
-    # validate we are not missing data in the feature store
-    location_ids = ts_data['pickup_location_id'].unique()
-    assert len(ts_data) == config.N_FEATURES * len(location_ids), \
-        "Time-series data is not complete. Make sure your feature pipeline is up and runnning."
-
-    # transpose time-series data as a feature vector, for each `pickup_location_id`
-    x = np.ndarray(shape=(len(location_ids), n_features), dtype=np.float32)
-    for i, location_id in enumerate(location_ids):
-        ts_data_i = ts_data.loc[ts_data.pickup_location_id == location_id, :]
-        ts_data_i = ts_data_i.sort_values(by=['pickup_hour'])
-        x[i, :] = ts_data_i['rides'].values
-
-    # numpy arrays to Pandas dataframes
-    features = pd.DataFrame(
-        x,
-        columns=[
-            f'rides_previous_{i+1}_hour' for i in reversed(range(n_features))]
-    )
-    features['pickup_hour'] = current_date
-    features['pickup_location_id'] = location_ids
-    features.sort_values(by=['pickup_location_id'], inplace=True)
-
-    return features
-
-
-def load_model_from_registry():
-
-    import joblib
-    from pathlib import Path
-
-    project = get_hopsworks_project()
-    model_registry = project.get_model_registry()
-
-    model = model_registry.get_model(
-        name=config.MODEL_NAME,
-        version=config.MODEL_VERSION,
-    )
-
-    model_dir = model.download()
-    model = joblib.load(Path(model_dir) / 'model.pkl')
-
-    return model
-
-
-def load_predictions_from_store(
-    from_pickup_hour: datetime,
-    to_pickup_hour: datetime
-) -> pd.DataFrame:
+    We add retry to this function because sometimes the feature store API fails, because
+    of too many concurrent jobs.
     """
-    Connects to the feature store and retrieves model predictions for all
-    `pickup_location_id`s and for the time period from `from_pickup_hour`
-    to `to_pickup_hour`
+    logger.info('Getting pointer to the feature group for model predictions')
+    feature_group = get_or_create_feature_group(FEATURE_GROUP_PREDICTIONS_METADATA)
 
-    Args:
-        from_pickup_hour (datetime): min datetime (rounded hour) for which we want to get
-        predictions
+    try:
+        logger.info('Saving predictions to the feature store')
+        feature_group.insert(predictions, write_options={'wait_for_job': False})
+    except RestAPIError as e:
+        logger.error(f"Failed to save predictions to the feature store: {e}")
+        raise e
 
-        to_pickup_hour (datetime): max datetime (rounded hour) for which we want to get
-        predictions
 
-    Returns:
-        pd.DataFrame: 3 columns:
-            - `pickup_location_id`
-            - `predicted_demand`
-            - `pickup_hour`
-    """
-    from src.config import FEATURE_VIEW_PREDICTIONS_METADATA
-    from src.feature_store_api import get_or_create_feature_view
+def inference(current_date: Optional[pd.Timestamp] = pd.to_datetime(datetime.utcnow()).floor('H')) -> None:
+    """Inference pipeline for taxi demand prediction"""
+    logger.info(f'Running inference pipeline for {current_date}')
 
-    # get pointer to the feature view
-    predictions_fv = get_or_create_feature_view(
-        FEATURE_VIEW_PREDICTIONS_METADATA)
+    logger.info('Loading batch of features from the feature store')
+    features = load_batch_of_features_from_store(current_date)
 
-    # get data from the feature view
-    print(
-        f'Fetching predictions for `pickup_hours` between {from_pickup_hour}  and {to_pickup_hour}')
-    predictions = predictions_fv.get_batch_data(
-        start_time=from_pickup_hour - timedelta(days=1),
-        end_time=to_pickup_hour + timedelta(days=1)
+    logger.info('Loading model from the model registry')
+    model = get_latest_model_from_registry(model_name=MODEL_NAME, status='Production')
+
+    logger.info('Generating predictions')
+    predictions = get_model_predictions(model, features)
+
+    # Add `pickup_hour` and `pickup_ts` columns
+    predictions['pickup_hour'] = current_date
+    predictions['pickup_ts'] = predictions['pickup_hour'].astype(int) // 10**6
+
+    logger.info('Saving predictions to the feature store')
+    save_predictions_to_feature_store(predictions)
+
+    logger.info('Inference DONE!')
+
+
+if __name__ == '__main__':
+    # Parse command line arguments
+    parser = ArgumentParser()
+    parser.add_argument(
+        '--datetime',
+        type=lambda s: datetime.strptime(s, '%Y-%m-%d %H:%M:%S'),
+        help='Datetime argument in the format of YYYY-MM-DD HH:MM:SS',
     )
+    args = parser.parse_args()
 
-    # make sure datetimes are UTC aware
-    predictions['pickup_hour'] = pd.to_datetime(
-        predictions['pickup_hour'], utc=True)
-    from_pickup_hour = pd.to_datetime(from_pickup_hour, utc=True)
-    to_pickup_hour = pd.to_datetime(to_pickup_hour, utc=True)
+    # If datetime was provided, use it; otherwise, use current datetime
+    current_date = pd.to_datetime(args.datetime) if args.datetime else pd.to_datetime(datetime.utcnow()).floor('H')
 
-    # make sure we keep only the range we want
-    predictions = predictions[predictions.pickup_hour.between(
-        from_pickup_hour, to_pickup_hour)]
-
-    # sort by `pick_up_hour` and `pickup_location_id`
-    predictions.sort_values(
-        by=['pickup_hour', 'pickup_location_id'], inplace=True)
-
-    return predictions
+    logger.info(f'Running feature pipeline for {current_date}')
+    inference(current_date)
