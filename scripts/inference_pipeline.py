@@ -24,13 +24,11 @@ def save_predictions_to_feature_store(predictions: pd.DataFrame) -> None:
     of too many concurrent jobs.
     """
     logger.info('Getting pointer to the feature group for model predictions')
-    feature_group = get_or_create_feature_group(
-        FEATURE_GROUP_PREDICTIONS_METADATA)
+    feature_group = get_or_create_feature_group(FEATURE_GROUP_PREDICTIONS_METADATA)
 
     try:
         logger.info('Saving predictions to the feature store')
-        feature_group.insert(predictions, write_options={
-                             'wait_for_job': False})
+        feature_group.insert(predictions, write_options={'wait_for_job': False})
 
     except RestAPIError as e:
         logger.info('Failed to save predictions to the feature store')
@@ -39,8 +37,7 @@ def save_predictions_to_feature_store(predictions: pd.DataFrame) -> None:
 
 
 def inference(
-    current_date: Optional[pd.Timestamp] = pd.to_datetime(
-        datetime.utcnow()).floor('H'),
+    current_date: Optional[pd.Timestamp] = pd.to_datetime(datetime.utcnow()).floor('H'),
 ) -> None:
     """"""
     logger.info(f'Running inference pipeline for {current_date}')
@@ -49,8 +46,7 @@ def inference(
     features = load_batch_of_features_from_store(current_date)
 
     logger.info('Loading model from the model registry')
-    model = get_latest_model_from_registry(
-        model_name=MODEL_NAME, status='Production')
+    model = get_latest_model_from_registry(model_name=MODEL_NAME, status='Production')
 
     logger.info('Generating predictions')
     predictions = get_model_predictions(model, features)

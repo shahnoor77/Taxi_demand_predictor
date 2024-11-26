@@ -1,4 +1,3 @@
-
 import os
 from pathlib import Path
 import pickle
@@ -37,7 +36,6 @@ def get_model_registry() -> None:
     )
     return project.get_model_registry()
 
-
 def push_model_to_registry(
     model: Pipeline,
     model_name: str,
@@ -50,7 +48,7 @@ def push_model_to_registry(
 
     # Get the stale experiment from the global context to grab the API key and experiment ID.
     stale_experiment = comet_ml.get_global_experiment()
-
+    
     # Resume the expriment using its API key and experiment ID.
     experiment = comet_ml.ExistingExperiment(
         api_key=stale_experiment.api_key, experiment_key=stale_experiment.id
@@ -60,7 +58,7 @@ def push_model_to_registry(
     logger.info(f"Starting logging model to Comet ML")
     experiment.log_model(model_name, str(model_file))
     logger.info(f"Finished logging model {model_name}")
-
+    
     # push model to the registry
     logger.info('Pushing model to the registry as "Production"')
     experiment.register_model(model_name, status='Production')
@@ -78,18 +76,16 @@ def get_latest_model_version(model_name: str, status: str) -> str:
     """
     # find all model versions from the given `model_name` registry and `status`
     api = API(COMET_ML_API_KEY)
-    model_details = api.get_registry_model_details(
-        COMET_ML_WORKSPACE, model_name)['versions']
-    model_versions = [md['version']
-                      for md in model_details if md['status'] == status]
-
+    model_details = api.get_registry_model_details(COMET_ML_WORKSPACE, model_name)['versions']
+    model_versions = [md['version'] for md in model_details if md['status'] == status]
+    
     # return the latest model version
     return max(model_versions)
 
 
 def get_latest_model_from_registry(model_name: str, status: str) -> Pipeline:
     """Returns the latest model from the registry"""
-
+    
     # get model version to download
     model_version = get_latest_model_version(model_name, status)
 
