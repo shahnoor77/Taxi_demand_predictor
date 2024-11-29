@@ -8,7 +8,7 @@ readme = "README.md"
 [tool.poetry.dependencies]
 python = ">=3.11.0,<3.13"
 wget = "^3.2"
-pandas = "<2.2.0"
+pandas = ">=2.1.1"
 jupyter = "^1.0.0"
 pyarrow = "^17.0.0"
 requests = "^2.32.3"
@@ -30,6 +30,7 @@ comet = "^3.1.0"
 comet-ml = "^3.47.3"
 streamlit = "^1.40.1"
 geopandas = "^1.0.1"
+numpy = "1.26.0"
 
 
 [tool.poetry.group.dev.dependencies]
