@@ -11,8 +11,8 @@ on:
   workflow_dispatch:
 
 env:
-  PYTHON_VERSION: 3.9
-  POETRY_VERSION: 1.8.2
+  PYTHON_VERSION: 3.9.10
+  POETRY_VERSION: 0.1.0
   POETRY_URL: https://install.python-poetry.org
 
 jobs:
@@ -59,3 +59,4 @@ jobs:
         COMET_ML_WORKSPACE: ${{ secrets.COMET_ML_WORKSPACE }}
         COMET_ML_PROJECT_NAME: ${{ secrets.COMET_ML_PROJECT_NAME }}
       run: poetry run python scripts/inference_pipeline.py
+  

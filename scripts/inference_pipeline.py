@@ -1,3 +1,4 @@
+
 from argparse import ArgumentParser
 from datetime import datetime
 from typing import Optional
@@ -57,7 +58,7 @@ def inference(
 
     # add `pickup_hour` and `pickup_ts` columns
     predictions['pickup_hour'] = current_date
-    predictions['pickup_ts'] = predictions['pickup_hour'].astype(int) // 10**6
+    predictions['pickup_ts'] = predictions['pickup_hour'].astype('int64') // 10**6
 
     logger.info('Saving predictions to the feature store')
     save_predictions_to_feature_store(predictions)

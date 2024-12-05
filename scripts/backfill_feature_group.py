@@ -43,7 +43,7 @@ def run():
     # add new column with the timestamp in Unix seconds
     ts_data['pickup_hour'] = pd.to_datetime(ts_data['pickup_hour'], utc=True)
     ts_data['pickup_ts'] = ts_data['pickup_hour'].astype(
-        int) // 10**6  # Unix milliseconds
+        'int64') // 10**6  # Unix milliseconds
 
     # get a pointer to the feature group we wanna write to
     feature_group = get_or_create_feature_group(FEATURE_GROUP_METADATA)
