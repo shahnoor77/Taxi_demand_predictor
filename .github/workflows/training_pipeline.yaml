@@ -30,14 +30,20 @@ jobs:
           key: poetry-v2-${{ runner.os }}-${{ env.PYTHON_VERSION }}-${{ hashFiles('**/poetry.lock') }}-${{ hashFiles('.github/workflows/*.yml') }}
 
       - name: Set up Python ${{ env.PYTHON_VERSION }}
-        uses: actions/setup-python@v4
+        uses: actions/setup-python@v3  # Change to v3
         with:
           python-version: ${{ env.PYTHON_VERSION }}
+
+      - name: Check Python Version  # Added for debugging
+        run: python --version
 
       - name: Install Poetry
         run: |
           curl -sSL ${{ env.POETRY_URL }} | python - --version ${{ env.POETRY_VERSION }}
           echo "$HOME/.local/bin" >> $GITHUB_PATH
+
+      - name: Check Poetry Version  # Added for debugging
+        run: poetry --version
 
       - name: Install Dependencies
         run: poetry install
